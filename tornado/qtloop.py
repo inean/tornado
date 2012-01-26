@@ -73,7 +73,7 @@ class _Poller(object):
             ntype = QSocketNotifier.Write
             notif = self.writers.setdefault(fd, _Notifier(ntype, fd, self))
             notif.enabled = True
-            
+
         if events & READ:
             ntype = QSocketNotifier.Read
             notif = self.readers.setdefault(fd, _Notifier(ntype, fd, self))
@@ -187,7 +187,7 @@ class QtLoop(IOLoop):
                         fd, exc_info=True)
             except Exception:
                 logging.error(
-                    "Exception in I/O handler for fd %s", 
+                    "Exception in I/O handler for fd %s",
                     fd, exc_info=True)
 
         # process pending callbacks and timeouts
@@ -198,7 +198,7 @@ class QtLoop(IOLoop):
         """Installs IOLoop"""
         IOLoop.install(self)
         return self
-        
+
     def start(self):
         """Starts the I/O loop.
 
@@ -219,7 +219,7 @@ class QtLoop(IOLoop):
         # iterate over all callbacks (if any and timeouts)
         while self._iterate():
             pass
-        
+
          # check that we are still running
         if self._running:
             # listen to events
