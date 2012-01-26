@@ -42,10 +42,9 @@ if major >= 3:
 distutils.core.setup(
     name="tornado",
     version=version,
-    packages = ["tornado", "tornado.test", "tornado.platform"],
+    packages = ["tornado", "tornado.platform"],
     package_data = {
         "tornado": ["ca-certificates.crt"],
-        "tornado.test": ["README", "test.crt", "test.key", "static/robots.txt"],
         },
     ext_modules = extensions,
     author="Facebook",
