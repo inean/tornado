@@ -194,6 +194,11 @@ class QtLoop(IOLoop):
         while self._iterate():
             pass
 
+    def install(self):
+        """Installs IOLoop"""
+        IOLoop.install(self)
+        return self
+        
     def start(self):
         """Starts the I/O loop.
 
