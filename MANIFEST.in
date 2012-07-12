@@ -1,3 +1,3 @@
-recursive-include *.py *.yaml *.html *.css *.js *.xml *.sql README
+recursive-include *.py README
 include tornado/ca-certificates.crt
 global-exclude _auto2to3*
