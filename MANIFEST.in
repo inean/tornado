@@ -1,3 +1,2 @@
-recursive-include *.py README
+include tornado/epoll.c
 include tornado/ca-certificates.crt
-global-exclude _auto2to3*
