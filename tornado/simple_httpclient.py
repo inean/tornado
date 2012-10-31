@@ -285,6 +285,13 @@ class _HTTPConnection(object):
             self.request.headers["Content-Type"] = "application/x-www-form-urlencoded"
         if self.request.use_gzip:
             self.request.headers["Accept-Encoding"] = "gzip"
+        if (self.request.body is not None and
+            self.request.progress_callback and
+            "Expect" not in self.request.headers):
+            # Send 100-continue if a progress callback is set.
+            if len(self.request.body) > WRITE_BUFFER_CHUNK_SIZE: #128Kb
+                self.request.headers["Expect"] = "100-continue"
+
         req_path = ((parsed.path or '/') +
                 (('?' + parsed.query) if parsed.query else ''))
         request_lines = [utf8("%s %s HTTP/1.1" % (self.request.method,
@@ -295,7 +302,7 @@ class _HTTPConnection(object):
                 raise ValueError('Newline in header: ' + repr(line))
             request_lines.append(line)
         self.stream.write(b("\r\n").join(request_lines) + b("\r\n\r\n"))
-        if self.request.body is not None:
+        if self.request.body is not None and "Expect" not in self.request.headers:
             self.stream.write(self.request.body)
         self.stream.read_until_regex(b("\r?\n\r?\n"), self._on_headers)
 
@@ -338,6 +345,7 @@ class _HTTPConnection(object):
         assert match
         code = int(match.group(1))
         if 100 <= code < 200:
+            self.stream.write(self.request.body)
             self.stream.read_until_regex(b("\r?\n\r?\n"), self._on_headers)
             return
         else:
