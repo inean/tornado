@@ -4,7 +4,7 @@ from __future__ import absolute_import, division, with_statement
 from tornado.escape import utf8, _unicode, native_str
 from tornado.httpclient import HTTPRequest, HTTPResponse, HTTPError, AsyncHTTPClient, main
 from tornado.httputil import HTTPHeaders
-from tornado.iostream import IOStream, SSLIOStream
+from tornado.iostream import IOStream, SSLIOStream, WRITE_BUFFER_CHUNK_SIZE
 from tornado import stack_context
 from tornado.util import b, GzipDecompressor
 
@@ -345,7 +345,7 @@ class _HTTPConnection(object):
         assert match
         code = int(match.group(1))
         if 100 <= code < 200:
-            self.stream.write(self.request.body)
+            self.stream.write(self.request.body, progress_callback=self.request.progress_callback)
             self.stream.read_until_regex(b("\r?\n\r?\n"), self._on_headers)
             return
         else:

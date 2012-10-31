@@ -229,7 +229,8 @@ class HTTPRequest(object):
                  connect_timeout=20.0, request_timeout=20.0,
                  if_modified_since=None, follow_redirects=True,
                  max_redirects=5, user_agent=None, use_gzip=True,
-                 network_interface=None, streaming_callback=None,
+                 network_interface=None, 
+                 progress_callback=None, streaming_callback=None,
                  header_callback=None, prepare_curl_callback=None,
                  proxy_host=None, proxy_port=None, proxy_username=None,
                  proxy_password='', allow_nonstandard_methods=False,
@@ -256,6 +257,8 @@ class HTTPRequest(object):
         :arg string user_agent: String to send as ``User-Agent`` header
         :arg bool use_gzip: Request gzip encoding from the server
         :arg string network_interface: Network interface to use for request
+        :arg callable progress_callback: If set, `progress_callback` will be
+           called every 50ms or so when  uploading content`
         :arg callable streaming_callback: If set, `streaming_callback` will
            be run with each chunk of data as it is received, and
            `~HTTPResponse.body` and `~HTTPResponse.buffer` will be empty in
@@ -310,6 +313,7 @@ class HTTPRequest(object):
         self.user_agent = user_agent
         self.use_gzip = use_gzip
         self.network_interface = network_interface
+        self.progress_callback = progress_callback
         self.streaming_callback = streaming_callback
         self.header_callback = header_callback
         self.prepare_curl_callback = prepare_curl_callback

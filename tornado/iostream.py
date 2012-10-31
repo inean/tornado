@@ -25,6 +25,7 @@ import os
 import socket
 import sys
 import re
+import time
 
 from tornado import ioloop
 from tornado import stack_context
@@ -35,6 +36,7 @@ try:
 except ImportError:
     ssl = None
 
+WRITE_BUFFER_CHUNK_SIZE = 128 * 1024
 
 class IOStream(object):
     r"""A utility class to write to and read from a non-blocking socket.
@@ -92,6 +94,7 @@ class IOStream(object):
         self._read_buffer = collections.deque()
         self._write_buffer = collections.deque()
         self._read_buffer_size = 0
+        self._write_buffer_size = 0
         self._write_buffer_frozen = False
         self._read_delimiter = None
         self._read_regex = None
@@ -99,6 +102,8 @@ class IOStream(object):
         self._read_until_close = False
         self._read_callback = None
         self._streaming_callback = None
+        self._progress_callback = None
+        self._progress_timeout = 0
         self._write_callback = None
         self._close_callback = None
         self._connect_callback = None
@@ -190,7 +195,7 @@ class IOStream(object):
         self._streaming_callback = stack_context.wrap(streaming_callback)
         self._add_io_state(self.io_loop.READ)
 
-    def write(self, data, callback=None):
+    def write(self, data, callback=None, progress_callback=None):
         """Write the given data to this stream.
 
         If callback is given, we call it when all of the buffered write
@@ -206,13 +211,15 @@ class IOStream(object):
             # Break up large contiguous strings before inserting them in the
             # write buffer, so we don't have to recopy the entire thing
             # as we slice off pieces to send to the socket.
-            WRITE_BUFFER_CHUNK_SIZE = 128 * 1024
             if len(data) > WRITE_BUFFER_CHUNK_SIZE:
                 for i in range(0, len(data), WRITE_BUFFER_CHUNK_SIZE):
                     self._write_buffer.append(data[i:i + WRITE_BUFFER_CHUNK_SIZE])
             else:
                 self._write_buffer.append(data)
+        # reset values
+        self._progress_callback = stack_context.wrap(progress_callback)
         self._write_callback = stack_context.wrap(callback)
+        self._write_buffer_size = 0
         if not self._connecting:
             self._handle_write()
             if self._write_buffer:
@@ -545,6 +552,7 @@ class IOStream(object):
                 self._write_buffer_frozen = False
                 _merge_prefix(self._write_buffer, num_bytes)
                 self._write_buffer.popleft()
+                self._write_buffer_size += num_bytes
             except socket.error, e:
                 if e.args[0] in (errno.EWOULDBLOCK, errno.EAGAIN):
                     self._write_buffer_frozen = True
@@ -554,10 +562,21 @@ class IOStream(object):
                                     self.socket.fileno(), e)
                     self.close()
                     return
-        if not self._write_buffer and self._write_callback:
-            callback = self._write_callback
-            self._write_callback = None
-            self._run_callback(callback)
+            if self._progress_callback:
+                if time.time() - self._progress_timeout > 0.05: # 50ms
+                    callback = self._progress_callback
+                    self._run_callback(callback, self._write_buffer_size)
+                    self._progress_timeout = time.time()
+                    
+        if not self._write_buffer:
+            if self._progress_callback:
+                callback = self._progress_callback
+                self._progress_callback = None
+                self._run_callback(callback, self._write_buffer_size)
+            if self._write_callback:
+                callback = self._write_callback
+                self._write_callback = None
+                self._run_callback(callback)
 
     def _consume(self, loc):
         if loc == 0:
