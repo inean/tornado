@@ -230,3 +230,7 @@ class QtLoop(IOLoop):
         # clean heartbeat signal
         if self._blocking_signal_threshold is not None:
             signal.setitimer(signal.ITIMER_REAL, 0, 0)
+
+    def install(self):
+        IOLoop.install(self)
+        return self
