@@ -325,6 +325,16 @@ class HTTPRequest(object):
         self.client_cert = client_cert
         self.start_time = time.time()
 
+    def bind(self, connection):
+        assert not hasattr(self, "_connection")
+        self._connection = connection
+        
+    def cancel(self):
+        if self._connection:
+            self._connection.final_callback = None
+            self._connection.stream.close()
+            return
+        raise HTTPError(599, "Non cancellable request")
 
 class HTTPResponse(object):
     """HTTP Response object.

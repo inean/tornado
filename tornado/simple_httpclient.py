@@ -102,6 +102,7 @@ class SimpleAsyncHTTPClient(AsyncHTTPClient):
             logging.debug("max_clients limit reached, request queued. "
                           "%d active, %d queued requests." % (
                     len(self.active), len(self.queue)))
+        return request
 
     def _process_queue(self):
         with stack_context.NullContext():
@@ -109,10 +110,10 @@ class SimpleAsyncHTTPClient(AsyncHTTPClient):
                 request, callback = self.queue.popleft()
                 key = object()
                 self.active[key] = (request, callback)
-                _HTTPConnection(self.io_loop, self, request,
+                request.bind(_HTTPConnection(self.io_loop, self, request,
                                 functools.partial(self._release_fetch, key),
                                 callback,
-                                self.max_buffer_size)
+                                self.max_buffer_size))
 
     def _release_fetch(self, key):
         del self.active[key]
