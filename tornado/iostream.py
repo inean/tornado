@@ -195,6 +195,31 @@ class IOStream(object):
         self._streaming_callback = stack_context.wrap(streaming_callback)
         self._add_io_state(self.io_loop.READ)
 
+    def write_stream(self, data):
+        curpos = data.tell()
+        while(True):
+            chunk = data.read(WRITE_BUFFER_CHUNK_SIZE)
+            if chunk == '':
+                break
+            self._write_buffer.append(chunk)
+        # restore original position
+        data.seek(curpos)
+            
+    def write_bytes(self, data):
+        assert isinstance(data, bytes_type)
+        # We use bool(_write_buffer) as a proxy for write_buffer_size>0,
+        # so never put empty strings in the buffer.
+        assert data
+
+        # Break up large contiguous strings before inserting them in the
+        # write buffer, so we don't have to recopy the entire thing
+        # as we slice off pieces to send to the socket.
+        if len(data) > WRITE_BUFFER_CHUNK_SIZE:
+            for i in range(0, len(data), WRITE_BUFFER_CHUNK_SIZE):
+                self._write_buffer.append(data[i:i + WRITE_BUFFER_CHUNK_SIZE])
+        else:
+            self._write_buffer.append(data)
+        
     def write(self, data, callback=None, progress_callback=None):
         """Write the given data to this stream.
 
@@ -203,19 +228,10 @@ class IOStream(object):
         previously buffered write data and an old write callback, that
         callback is simply overwritten with this new callback.
         """
-        assert isinstance(data, bytes_type)
         self._check_closed()
-        # We use bool(_write_buffer) as a proxy for write_buffer_size>0,
-        # so never put empty strings in the buffer.
-        if data:
-            # Break up large contiguous strings before inserting them in the
-            # write buffer, so we don't have to recopy the entire thing
-            # as we slice off pieces to send to the socket.
-            if len(data) > WRITE_BUFFER_CHUNK_SIZE:
-                for i in range(0, len(data), WRITE_BUFFER_CHUNK_SIZE):
-                    self._write_buffer.append(data[i:i + WRITE_BUFFER_CHUNK_SIZE])
-            else:
-                self._write_buffer.append(data)
+        # evaluate body
+        data and (self.write_stream(data) if hasattr(data, 'read') else self.write_bytes(data))
+            
         # reset values
         self._progress_callback = stack_context.wrap(progress_callback)
         self._write_callback = stack_context.wrap(callback)
