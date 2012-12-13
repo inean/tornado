@@ -278,20 +278,25 @@ class _HTTPConnection(object):
                 assert self.request.body is not None
             else:
                 assert self.request.body is None
+                
         if self.request.body is not None:
-            self.request.headers["Content-Length"] = str(len(
-                    self.request.body))
+            body_len = len(self.request.body)
+            self.request.headers["Content-Length"] = str(body_len)
+            
+            if self.request.progress_callback:
+                self.request.progress_callback = functools.partial(
+                    self.request.progress_callback, body_len)
+                
+                if body_len > WRITE_BUFFER_CHUNK_SIZE and \
+                   "Expect" not in self.request.headers: #128Kb
+                    # Send 100-continue if a progress callback is set.
+                    self.request.headers["Expect"] = "100-continue"
+
         if (self.request.method == "POST" and
             "Content-Type" not in self.request.headers):
             self.request.headers["Content-Type"] = "application/x-www-form-urlencoded"
         if self.request.use_gzip:
             self.request.headers["Accept-Encoding"] = "gzip"
-        if (self.request.body is not None and
-            self.request.progress_callback and
-            "Expect" not in self.request.headers):
-            # Send 100-continue if a progress callback is set.
-            if len(self.request.body) > WRITE_BUFFER_CHUNK_SIZE: #128Kb
-                self.request.headers["Expect"] = "100-continue"
 
         req_path = ((parsed.path or '/') +
                 (('?' + parsed.query) if parsed.query else ''))

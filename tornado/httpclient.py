@@ -336,6 +336,12 @@ class HTTPRequest(object):
             return
         raise HTTPError(599, "Non cancellable request")
 
+    def progress(self, callback):
+        if not self._connection or not self._connection.headers:
+            self.progress_callback = callback
+            return
+        raise HTTPError(599, "Headers already set")
+            
 class HTTPResponse(object):
     """HTTP Response object.
 
