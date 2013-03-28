@@ -278,7 +278,6 @@ class _HTTPConnection(object):
                 assert self.request.body is not None
             else:
                 assert self.request.body is None
-                
         if self.request.body is not None:
             body_len = len(self.request.body)
             self.request.headers["Content-Length"] = str(body_len)
@@ -297,7 +296,6 @@ class _HTTPConnection(object):
             self.request.headers["Content-Type"] = "application/x-www-form-urlencoded"
         if self.request.use_gzip:
             self.request.headers["Accept-Encoding"] = "gzip"
-
         req_path = ((parsed.path or '/') +
                 (('?' + parsed.query) if parsed.query else ''))
         request_lines = [utf8("%s %s HTTP/1.1" % (self.request.method,
