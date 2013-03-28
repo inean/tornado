@@ -119,7 +119,7 @@ class IOStream(object):
         self._state = None
         self._pending_callbacks = 0
 
-    def connect(self, address, callback=None):
+    def connect(self, address, callback=None, server_hostname=None):
         """Connects the socket to a remote address without blocking.
 
         May only be called if the socket passed to the constructor was
@@ -677,6 +677,7 @@ class SSLIOStream(IOStream):
         self._handshake_reading = False
         self._handshake_writing = False
         self._ssl_connect_callback = None
+        self._server_hostname = None
 
     def reading(self):
         return self._handshake_reading or super(SSLIOStream, self).reading()
@@ -719,6 +720,33 @@ class SSLIOStream(IOStream):
                 self._ssl_connect_callback = None
                 self._run_callback(callback)
 
+    def _verify_cert(self, peercert):
+        """Returns True if peercert is valid according to the configured
+        validation mode and hostname.
+
+        The ssl handshake already tested the certificate for a valid
+        CA signature; the only thing that remains is to check
+        the hostname.
+        """
+        if isinstance(self._ssl_options, dict):
+            verify_mode = self._ssl_options.get('cert_reqs', ssl.CERT_NONE)
+        elif isinstance(self._ssl_options, ssl.SSLContext):
+            verify_mode = self._ssl_options.verify_mode
+        assert verify_mode in (ssl.CERT_NONE, ssl.CERT_REQUIRED, ssl.CERT_OPTIONAL)
+        if verify_mode == ssl.CERT_NONE or self._server_hostname is None:
+            return True
+        cert = self.socket.getpeercert()
+        if cert is None and verify_mode == ssl.CERT_REQUIRED:
+            gen_log.warning("No SSL certificate given")
+            return False
+        try:
+            ssl_match_hostname(peercert, self._server_hostname)
+        except SSLCertificateError:
+            gen_log.warning("Invalid SSL certificate", exc_info=True)
+            return False
+        else:
+            return True
+
     def _handle_read(self):
         if self._ssl_accepting:
             self._do_ssl_handshake()
@@ -731,10 +759,11 @@ class SSLIOStream(IOStream):
             return
         super(SSLIOStream, self)._handle_write()
 
-    def connect(self, address, callback=None):
+    def connect(self, address, callback=None, server_hostname=None):
         # Save the user's callback and run it after the ssl handshake
         # has completed.
         self._ssl_connect_callback = callback
+        self._server_hostname = server_hostname
         super(SSLIOStream, self).connect(address, callback=None)
 
     def _handle_connect(self):
@@ -744,9 +773,9 @@ class SSLIOStream(IOStream):
         # user callbacks are enqueued asynchronously on the IOLoop,
         # but since _handle_events calls _handle_connect immediately
         # followed by _handle_write we need this to be synchronous.
-        self.socket = ssl.wrap_socket(self.socket,
-                                      do_handshake_on_connect=False,
-                                      **self._ssl_options)
+        self.socket = ssl_wrap_socket(self.socket, self._ssl_options,
+                                      server_hostname=self._server_hostname,
+                                      do_handshake_on_connect=False)
         super(SSLIOStream, self)._handle_connect()
 
     def _read_from_socket(self):
