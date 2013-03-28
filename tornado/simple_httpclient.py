@@ -101,10 +101,11 @@ class SimpleAsyncHTTPClient(AsyncHTTPClient):
                 request, callback = self.queue.popleft()
                 key = object()
                 self.active[key] = (request, callback)
-                request.bind(_HTTPConnection(self.io_loop, self, request,
-                                functools.partial(self._release_fetch, key),
-                                callback,
-                                self.max_buffer_size, self.resolver)
+                request.bind(_HTTPConnection(
+                    self.io_loop, self, request,
+                    functools.partial(self._release_fetch, key),
+                    callback,
+                    self.max_buffer_size, self.resolver))
 
     def _release_fetch(self, key):
         del self.active[key]

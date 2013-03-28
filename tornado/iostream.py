@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 #
 # Copyright 2009 Facebook
 #
@@ -34,17 +33,20 @@ import socket
 import sys
 import re
 import time
+import ssl
 
 from tornado import ioloop
+from tornado.netutil import ssl_wrap_socket, ssl_match_hostname, SSLCertificateError
 from tornado import stack_context
 from tornado.util import b, bytes_type
 
 try:
-    import ssl  # Python 2.6+
+    from tornado.platform.posix import _set_nonblocking
 except ImportError:
-    ssl = None
+    _set_nonblocking = None
 
 WRITE_BUFFER_CHUNK_SIZE = 128 * 1024
+
 
 class IOStream(object):
     r"""A utility class to write to and read from a non-blocking socket.
@@ -212,7 +214,7 @@ class IOStream(object):
             self._write_buffer.append(chunk)
         # restore original position
         data.seek(curpos)
-            
+
     def write_bytes(self, data):
         assert isinstance(data, bytes_type)
         # We use bool(_write_buffer) as a proxy for write_buffer_size>0,
@@ -227,7 +229,7 @@ class IOStream(object):
                 self._write_buffer.append(data[i:i + WRITE_BUFFER_CHUNK_SIZE])
         else:
             self._write_buffer.append(data)
-        
+
     def write(self, data, callback=None, progress_callback=None):
         """Write the given data to this stream.
 
@@ -239,7 +241,7 @@ class IOStream(object):
         self._check_closed()
         # evaluate body
         data and (self.write_stream(data) if hasattr(data, 'read') else self.write_bytes(data))
-            
+
         # reset values
         self._progress_callback = stack_context.wrap(progress_callback)
         self._write_callback = stack_context.wrap(callback)
@@ -591,7 +593,7 @@ class IOStream(object):
                     callback = self._progress_callback
                     self._run_callback(callback, self._write_buffer_size)
                     self._progress_timeout = time.time()
-                    
+
         if not self._write_buffer:
             if self._progress_callback:
                 callback = self._progress_callback

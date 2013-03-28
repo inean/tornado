@@ -3,23 +3,7 @@ import socket
 
 from tornado import gen
 from tornado.ioloop import IOLoop
-
-
-def is_valid_ip(ip):
-    """Returns true if the given string is a well-formed IP address.
-
-    Supports IPv4 and IPv6.
-    """
-    try:
-        res = socket.getaddrinfo(ip, 0, socket.AF_UNSPEC,
-                                 socket.SOCK_STREAM,
-                                 0, socket.AI_NUMERICHOST)
-        return bool(res)
-    except socket.gaierror as e:
-        if e.args[0] == socket.EAI_NONAME:
-            return False
-        raise
-    return True
+from tornado.netutil import is_valid_ip
 
 
 class CaresResolver(object):
