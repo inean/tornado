@@ -739,12 +739,12 @@ class SSLIOStream(IOStream):
             return True
         cert = self.socket.getpeercert()
         if cert is None and verify_mode == ssl.CERT_REQUIRED:
-            gen_log.warning("No SSL certificate given")
+            logging.warning("No SSL certificate given")
             return False
         try:
             ssl_match_hostname(peercert, self._server_hostname)
         except SSLCertificateError:
-            gen_log.warning("Invalid SSL certificate", exc_info=True)
+            logging.warning("Invalid SSL certificate", exc_info=True)
             return False
         else:
             return True
