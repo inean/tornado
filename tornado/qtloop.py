@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#-*- mode: python; coding: utf-8 -*-
 
 from __future__ import with_statement
 
@@ -6,6 +6,9 @@ import heapq
 import thread
 import threading
 import time
+import logging
+import errno
+import signal
 
 from PySide.QtCore import QCoreApplication
 from PySide.QtCore import QObject, QSocketNotifier, QTimer
@@ -14,13 +17,14 @@ from tornado.ioloop import IOLoop
 
 NONE, READ, WRITE, ERROR = (0, 0x001, 0x004, 0x008 | 0x0010)
 
+
 class _Notifier(QObject):
     """Connection between an fd event and reader/writer callbacks."""
 
     _N = {
         QSocketNotifier.Read:  0x001,
         QSocketNotifier.Write: 0x004,
-        }
+    }
 
     def __init__(self, ntype, watcher, poller):
         QObject.__init__(self)
@@ -91,7 +95,7 @@ class _Poller(object):
         self.register(fd, events)
 
     def poll(self, callback):
-        self.callback=callback
+        self.callback = callback
         self.owns_loop and QCoreApplication.instance().exec_()
 
     def unpoll(self):
@@ -106,7 +110,7 @@ class _Poller(object):
 
 class QtLoop(IOLoop):
     def __init__(self, owns_loop=True):
-	    IOLoop.__init__(self, _Poller(owns_loop))
+        IOLoop.__init__(self, _Poller(owns_loop))
 
     def _iterate(self):
         # no timeouts
@@ -156,7 +160,7 @@ class QtLoop(IOLoop):
             # iterate again, callbacks pending
             return True
 
-        if poll_timeout  > 0.0:
+        if poll_timeout > 0.0:
             # add Timer
             self._impl.shot(poll_timeout, self._iterate)
 
@@ -194,11 +198,6 @@ class QtLoop(IOLoop):
         while self._iterate():
             pass
 
-    def install(self):
-        """Installs IOLoop"""
-        IOLoop.install(self)
-        return self
-
     def start(self):
         """Starts the I/O loop.
 
@@ -232,5 +231,6 @@ class QtLoop(IOLoop):
             signal.setitimer(signal.ITIMER_REAL, 0, 0)
 
     def install(self):
+        """Installs IOLoop"""
         IOLoop.install(self)
         return self
