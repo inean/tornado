@@ -303,6 +303,8 @@ class BaseIOStream(object):
             if events & self.io_loop.WRITE:
                 if self._connecting:
                     self._handle_connect()
+                    if self.closed():
+                        return
                 self._handle_write()
             if self.closed():
                 return
