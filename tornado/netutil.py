@@ -19,6 +19,7 @@ from __future__ import absolute_import, division, with_statement
 
 import socket
 import ssl
+import re
 
 
 def is_valid_ip(ip):
