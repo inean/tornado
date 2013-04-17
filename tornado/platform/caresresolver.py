@@ -1,11 +1,19 @@
+# -*- mode: python; coding: utf-8 -*-
+
+"""
+Async DNS resolver
+"""
+
 import pycares
 import socket
+import functools
 
 from tornado import gen
 from tornado.ioloop import IOLoop
 from tornado.netutil import is_valid_ip
 
 
+# pylint: disable-msg=R0903
 class CaresResolver(object):
     """Name resolver based on the c-ares library.
 
@@ -47,29 +55,44 @@ class CaresResolver(object):
 
     @gen.engine
     def resolve(self, host, port, family=socket.AF_UNSPEC, callback=None):
+        """DNS resolv"""
+
+        def _handle_response(address, error=None):
+            """Notify callback of response"""
+            if error:
+                raise Exception(
+                    'C-Ares returned error %s: %s while resolving %s' %
+                    (error, pycares.errno.strerror(error), host)
+                )
+            # Tornado 2.4 series has problems with exceptions at this
+            # context. To solve that, we emit exceptions from inside
+            # an add_calback call, which is more secure
+            addrinfo, addresses = [], address
+            if hasattr(address, 'addresses'):
+                addresses = address.addresses
+            # Parse address
+            for address in addresses:
+                if '.' in address:
+                    address_family = socket.AF_INET
+                elif ':' in address:
+                    address_family = socket.AF_INET6
+                else:
+                    address_family = socket.AF_UNSPEC
+                if family != socket.AF_UNSPEC and family != address_family:
+                    raise Exception(
+                        'Requested socket family %d but got %d' %
+                        (family, address_family)
+                    )
+                addrinfo.append((address_family, (address, port)))
+            # invoke callback with response; pylint: disable-msg=W0106
+            callable(callback) and callback(addrinfo)
+
         if is_valid_ip(host):
             addresses = [host]
+            _handle_response(addresses)
         else:
             # gethostbyname doesn't take callback as a kwarg
             self.channel.gethostbyname(host, family, (yield gen.Callback(1)))
-            callback_args = yield gen.Wait(1)
-            assert isinstance(callback_args, gen.Arguments)
-            assert not callback_args.kwargs
-            result, error = callback_args.args
-            if error:
-                raise Exception('C-Ares returned error %s: %s while resolving %s' %
-                                (error, pycares.errno.strerror(error), host))
-            addresses = result.addresses
-        addrinfo = []
-        for address in addresses:
-            if '.' in address:
-                address_family = socket.AF_INET
-            elif ':' in address:
-                address_family = socket.AF_INET6
-            else:
-                address_family = socket.AF_UNSPEC
-            if family != socket.AF_UNSPEC and family != address_family:
-                raise Exception('Requested socket family %d but got %d' %
-                                (family, address_family))
-            addrinfo.append((address_family, (address, port)))
-        callable(callback) and callback(addrinfo)
+            (result, error) = (yield gen.Wait(1)).args
+            _response_func = functools.partial(_handle_response, result, error)
+            self.io_loop.add_callback(_response_func)
